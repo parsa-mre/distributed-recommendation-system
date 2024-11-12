@@ -20,34 +20,41 @@ dummy_movie_db = {
 }
 
 # Function to recommend movies based on rating similarity
-def recommend_movies(movie_name, reviews_data):
+def recommend_movies(movie_name):
+    # Get the rating of the requested movie
     movie_rating = dummy_movie_db.get(movie_name, {}).get("rating", None)
     
-    if not movie_rating:
-        return []
+    if movie_rating is None:
+        # If the movie is not in the database, return an error message
+        return [], "Movie not found in database."
+    
+    # Recommend movies with ratings within 0.1 of the requested movie
+    recommended_movies = [
+        movie for movie, data in dummy_movie_db.items()
+        if abs(data["rating"] - movie_rating) <= 0.1 and movie != movie_name
+    ]
 
-    recommended_movies = []
-    for movie, data in dummy_movie_db.items():
-        if abs(data["rating"] - movie_rating) <= 0.1 and movie != movie_name:
-            recommended_movies.append(movie)
-
-    return recommended_movies
+    return recommended_movies, None
 
 # Route to process the request from the Master
 @app.route('/process', methods=['POST'])
 def process():
-    # Extract the movie name and reviews data from the request
+    # Extract the movie name from the request
     data = request.json
     movie_name = data.get('movie_name')
-    reviews = data.get('reviews')
     
-    if not movie_name or not reviews:
-        return jsonify({"error": "Movie name and reviews must be provided"}), 400
+    if not movie_name:
+        return jsonify({"error": "Movie name must be provided"}), 400
     
-    # Recommend movies based on the provided movie name
-    recommended_movies = recommend_movies(movie_name, reviews)
+    # Get movie recommendations
+    recommended_movies, error = recommend_movies(movie_name)
     
+    if error:
+        return jsonify({"error": error}), 404
+
     return jsonify({"recommended_movies": recommended_movies})
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5001)  # Worker listens on port 5001
+    import sys
+    port = int(sys.argv[1]) if len(sys.argv) > 1 else 5001  # Default port is 5001 if not specified
+    app.run(host="0.0.0.0", port=port)
